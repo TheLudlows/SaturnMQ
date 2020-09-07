@@ -20,7 +20,7 @@ impl Error for ParseError {}
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(f, "NError[{},{}]", self.code, self.error_description())
+        write!(f, "ParseError[{},{}]", self.code, self.error_description())
     }
 }
 
