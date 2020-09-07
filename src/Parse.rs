@@ -25,10 +25,17 @@ pub enum ParseResult<'a> {
 }
 
 pub struct SubMsg<'a> {
-
+    pub subject: &'a str,
+    pub sid: &'a str,
+    pub queue: Option<&'a str>,
 }
 
-pub struct PubMsg<'a> {}
+pub struct PubMsg<'a> {
+    pub subject: &'a str,
+    pub msg_ref: &'a str,
+    pub buf: &'a [u8],
+    pub size: usize,
+}
 
 const BUF_LEN: u32 = 512;
 
