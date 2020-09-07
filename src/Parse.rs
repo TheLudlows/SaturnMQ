@@ -1,16 +1,21 @@
-use crate::Error::ParseError;
-use crate::Parse::ParseState::{OpP, OpS};
-use crate::Error::ParseError::parse_error;
-#[macro_export]
-macro_rules! parse_error {
-    ( ) => {{
-        return Error(ParseError);
-    }};
+use crate::Error::{ParseError, ERROR_PARSE};
+use crate::Parse::ParseState::*;
+use crate::Error::Result;
+
+/**
+PUB <subject> <size>\r\n
+<message>\r\n
+*/
+
+
+pub fn parse_error() {
+    panic!("parse err");
 }
+
 struct Parser {
     state: ParseState,
     buf: [u8; 512],
-    arg_len: usize,
+    head_len: usize,
     msg_buf: Option<Vec<u8>>,
     //解析过程中收到新消息,那么 新消息的总长度是msg_total_len,已收到部分应该是msg_len
     msg_total_len: usize,
@@ -19,10 +24,11 @@ struct Parser {
 }
 
 pub enum ParseResult<'a> {
-    Error(ParseError),
+    Error,
     Sub(SubMsg<'a>),
     Pub(PubMsg<'a>),
 }
+
 
 pub struct SubMsg<'a> {
     pub subject: &'a str,
@@ -37,7 +43,7 @@ pub struct PubMsg<'a> {
     pub size: usize,
 }
 
-const BUF_LEN: u32 = 512;
+const BUF_LEN: usize = 512;
 
 pub enum ParseState {
     OpStart,
@@ -62,31 +68,69 @@ impl Parser {
         Self {
             state: ParseState::OpStart,
             buf: [0; BUF_LEN],
-            arg_len: 0,
+            head_len: 0,
             msg_buf: None,
             msg_total_len: 0,
             msg_len: 0,
             debug: false,
         }
     }
+    fn get_message_size(&self) -> Result<usize> {
+        let arg_buf = &self.buf[0..self.head_len];
+        let pos = arg_buf
+            .iter()
+            .rev()
+            .position(|b| *b == ' ' as u8 || *b == '\t' as u8);
+        if pos.is_none() {
+            parse_error();
+        }
+        let pos = pos.unwrap();
+        let size_buf = &arg_buf[arg_buf.len() - pos..];
+        let szb = unsafe {
+            std::str::from_utf8_unchecked(size_buf)
+        };
+        szb.parse::<usize>().map_err(|_| ParseError::new(ERROR_PARSE))
+    }
 
     pub fn parse(&mut self, buf: &[u8]) -> (ParseResult, usize) {
-        let index = 0;
-        while i < buf.len() {
-            let c = buf[i] as char;
-            match self.state {
-                ParseState::OpStart => {
-                    match c {
-                        'P' => self.state = OpP,
-                        'S' => self.state = OpS,
-                        _ => parse_error!()
-                    }
+        let mut index = 0;
+        while index < buf.len() {
+            let c = buf[index] as char;
+            match &self.state {
+                OpStart => match c {
+                    'P' => self.state = OpP,
+                    'S' => self.state = OpS,
+                    _ => parse_error()
                 }
-                ParseState::OpP => {}
-                ParseState::OpPu => {}
-                ParseState::OpPub => {}
-                ParseState::OpPubSpace => {}
-                ParseState::OpPubArg => {}
+                OpP => match c {
+                    'U' => self.state = OpPu,
+                    _ => parse_error(),
+                }
+                OpPu => match c {
+                    'B' => self.state = OpPub,
+                    _ => parse_error(),
+                }
+                OpPub => match c {
+                    ' ' => self.state = OpPubSpace,
+                    _ => parse_error(),
+                }
+                OpPubSpace => match c {
+                    ' ' | '\t' => {
+                        self.state = OpPubArg;
+                        self.head_len = 0;
+                        continue;
+                    }
+                    _ => parse_error(),
+                }
+                OpPubArg => match c {
+                    '\t' => {},
+                    '\n' => {
+                        self.state = OpMsg;
+                        let size = self.get_message_size()?;
+                    },
+                    // subject size
+                    _ => {}
+                }
                 ParseState::OpS => {}
                 ParseState::OpSu => {}
                 ParseState::OpSub => {}
@@ -94,8 +138,13 @@ impl Parser {
                 ParseState::OpSubArg => {}
                 ParseState::OpMsg => {}
                 ParseState::OpMsgFull => {}
+                _ => {}
             }
+            index += 1;
         }
-        return (ParseResult::new(), 1);
+        return (ParseResult::Error, 1);
     }
 }
+
+#[test]
+fn test() {}
