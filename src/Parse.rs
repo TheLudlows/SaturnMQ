@@ -20,9 +20,15 @@ struct Parser {
 
 pub enum ParseResult<'a> {
     Error(ParseError),
-    Sub(SubArg<'a>),
-    Pub(PubArg<'a>),
+    Sub(SubMsg<'a>),
+    Pub(PubMsg<'a>),
 }
+
+pub struct SubMsg<'a> {
+
+}
+
+pub struct PubMsg<'a> {}
 
 const BUF_LEN: u32 = 512;
 
@@ -68,44 +74,19 @@ impl Parser {
                         'S' => self.state = OpS,
                         _ => parse_error!()
                     }
-
-                },
-                ParseState::OpP => {
-
-                },
-                ParseState::OpPu => {
-
-                },
-                ParseState::OpPub => {
-
-                },
-                ParseState::OpPubSpace => {
-
-                },
-                ParseState::OpPubArg => {
-
-                },
-                ParseState::OpS => {
-
-                },
-                ParseState::OpSu => {
-
-                },
-                ParseState::OpSub => {
-
-                },
-                ParseState::OPSubSpace => {
-
-                },
-                ParseState::OpSubArg => {
-
-                },
-                ParseState::OpMsg => {
-
-                },
-                ParseState::OpMsgFull => {
-
-                },
+                }
+                ParseState::OpP => {}
+                ParseState::OpPu => {}
+                ParseState::OpPub => {}
+                ParseState::OpPubSpace => {}
+                ParseState::OpPubArg => {}
+                ParseState::OpS => {}
+                ParseState::OpSu => {}
+                ParseState::OpSub => {}
+                ParseState::OPSubSpace => {}
+                ParseState::OpSubArg => {}
+                ParseState::OpMsg => {}
+                ParseState::OpMsgFull => {}
             }
         }
         return (ParseResult::new(), 1);
