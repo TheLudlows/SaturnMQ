@@ -20,8 +20,8 @@ impl Error for ParseError {}
 
 impl Display for ParseError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
-        write!(f, "ParseError[{},{}]", self.code, self.error_description())
+        write!(f, "ParseError[{},{}]", self.code, "err")
     }
 }
 
-pub type Result<T> = std::result::Result<T, ParseError>;
+pub type MyResult<T> = std::result::Result<T, ParseError>;

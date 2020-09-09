@@ -1,6 +1,5 @@
-use crate::Error::{ParseError, ERROR_PARSE};
+use crate::Error::{ParseError, ERROR_PARSE, MyResult};
 use crate::Parse::ParseState::*;
-use crate::Error::Result;
 
 /**
 PUB <subject> <size>\r\n
@@ -75,7 +74,7 @@ impl Parser {
             debug: false,
         }
     }
-    fn get_message_size(&self) -> Result<usize> {
+    fn get_message_size(&self) -> MyResult<usize> {
         let arg_buf = &self.buf[0..self.head_len];
         let pos = arg_buf
             .iter()
@@ -92,7 +91,7 @@ impl Parser {
         szb.parse::<usize>().map_err(|_| ParseError::new(ERROR_PARSE))
     }
 
-    pub fn parse(&mut self, buf: &[u8]) -> (ParseResult, usize) {
+    pub fn parse(&mut self, buf: &[u8]) -> MyResult<(ParseResult, usize)> {
         let mut index = 0;
         while index < buf.len() {
             let c = buf[index] as char;
@@ -129,7 +128,9 @@ impl Parser {
                         let size = self.get_message_size()?;
                     },
                     // subject size
-                    _ => {}
+                    _ => {
+                        self.head_len +=1;
+                    }
                 }
                 ParseState::OpS => {}
                 ParseState::OpSu => {}
@@ -142,9 +143,28 @@ impl Parser {
             }
             index += 1;
         }
-        return (ParseResult::Error, 1);
+        return Ok((ParseResult::Error, 1));
     }
+}
+fn get_message_size(buf : &[u8]) -> MyResult<usize> {
+    let pos = buf
+        .iter()
+        .rev()
+        .position(|b| *b == ' ' as u8 || *b == '\t' as u8);
+    if pos.is_none() {
+        parse_error();
+    }
+    let pos = pos.unwrap();
+    let size_buf = &buf[buf.len() - pos..];
+    let szb = unsafe {
+        std::str::from_utf8_unchecked(size_buf)
+    };
+    szb.parse::<usize>().map_err(|_| ParseError::new(ERROR_PARSE))
 }
 
 #[test]
-fn test() {}
+fn test() {
+    let buf = "abc 123".as_bytes();
+    let size = get_message_size(&buf);
+    println!("{}",size.unwrap())
+}
