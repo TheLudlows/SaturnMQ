@@ -1,7 +1,7 @@
 use crate::Error::{ParseError, ERROR_PARSE, MyResult, NO_ONE};
 use crate::Parse::ParseState::*;
 use std::str::from_utf8_unchecked;
-use crate::Parse::ParseResult::Pub;
+use crate::Parse::ParseResult::{Pub, Sub};
 
 /**
 PUB <subject> <size>\r\n
@@ -37,7 +37,6 @@ pub enum ParseResult<'a> {
 pub struct SubMsg<'a> {
     pub subject: &'a str,
     pub sid: &'a str,
-    pub queue: Option<&'a str>,
 }
 
 pub struct PubMsg<'a> {
@@ -162,11 +161,39 @@ impl Parser {
                         parse_error()
                     }
                 }
-                ParseState::OpS => {}
-                ParseState::OpSu => {}
-                ParseState::OpSub => {}
-                ParseState::OPSubSpace => {}
-                ParseState::OpSubArg => {}
+                OpS => match c{
+                   'U' => self.state = OpSu,
+                    _ => parse_error(),
+
+                }
+                OpSu => match c{
+                    'B' => self.state = OpSub,
+                    _ => parse_error(),
+                }
+                OpSub => match c{
+                    ' '| '\t' => self.state = OPSubSpace,
+                    _ => parse_error(),
+                }
+                OPSubSpace => match c{
+                    ' '| '\t' =>{}
+                    _ => {
+                        self.state = OpSubArg;
+                        self.head_len = 0;
+                        continue;
+                    }
+                }
+                OpSubArg => match c{
+                    '\r' => {}
+                    '\n' => {
+                        self.state = OpStart;
+                        let sub_msg = self.process_sub();
+                        return Ok((Sub(sub_msg),index+1))
+                    }
+                    _ => {
+                        self.buf[self.head_len] = c as u8;
+                        self.head_len +=1;
+                    }
+                }
                 _ => {}
             }
             index += 1;
@@ -174,6 +201,15 @@ impl Parser {
         return Err(ParseError::new(NO_ONE));
     }
 
+    fn process_sub(&self) -> SubMsg {
+        let head = &self.buf[0..self.head_len];
+        let head_str = std::str::from_utf8(head).unwrap();
+        let mut args = head_str.split(' ').into_iter();
+        return SubMsg{
+            subject: args.next().unwrap(),
+            sid: args.next().unwrap(),
+        }
+    }
     fn process_msg(&self) -> PubMsg {
         let head = &self.buf[0..self.head_len];
         let head_str = unsafe { from_utf8_unchecked(head) };
@@ -189,7 +225,7 @@ impl Parser {
 }
 
 #[test]
-fn test() {
+fn test_pub() {
     let data = "PUB sub1 6\r\nabcdef\r\nPUB sub2 5\r\n12345\r\n".as_bytes();
     println!("{}", data.len());
     let mut parse = Parser::new();
@@ -202,15 +238,51 @@ fn test() {
     }
 }
 
+
+#[test]
+fn test_sub() {
+    let data = "SUB sub1 1\r\nSUB sub2 2\r\n".as_bytes();
+    println!("{}", data.len());
+    let mut parse = Parser::new();
+    let r = parse.parse(&data);
+    print_result(&r);
+    if let Ok(res) = r {
+        let index = res.1;
+        let r1 = parse.parse(&data[index..]);
+        print_result(&r1)
+    }
+}
+
+#[test]
+fn test_pub_sub() {
+    let mut data = "SUB sub1 1\r\nPUB pub1 2\r\nab\r\nSUB sub2 2\r\n".as_bytes();
+    println!("data size: {}", data.len());
+    let mut parse = Parser::new();
+    while data.len() > 0 {
+        let r = parse.parse(&data);
+        print_result(&r);
+        if let Ok(res) = r {
+            data = &data[res.1..];
+        }
+    }
+
+}
+
 fn print_result(r: &MyResult<(ParseResult, usize)>) {
     match r {
         Ok(res) => match &res.0 {
             Pub(msg) => {
-                println!("{:?}", msg.buf);
+                println!("{}", std::str::from_utf8(msg.buf).unwrap());
                 println!("{}", msg.size);
                 println!("{}", msg.subject);
-                println!("{}", res.1)
+                println!("index:{}", res.1)
             }
+            Sub(sub) => {
+                println!("{:?}", sub.subject);
+                println!("{}", sub.sid);
+                println!("index:{}", res.1)
+            }
+
             _ => {}
         }
         Err(e) => {
