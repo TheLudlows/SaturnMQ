@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 pub const ERROR_PARSE: i32 = 1;
+pub const NO_ONE: i32 = 2;
 
 #[derive(Debug)]
 pub struct ParseError {
